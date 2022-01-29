@@ -1,0 +1,12 @@
+name: RecSys
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8.12
+  - pip=21.3.1
+  - jupyterlab=3.2.8
+  - pytorch=1.6.0
+  - pandas=1.4.0
+  - matplotlib=3.5.0
+  - ignite=0.4.8
+  - optuna=2.10.0

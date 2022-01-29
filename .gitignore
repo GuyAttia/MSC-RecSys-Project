@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Edited
+data/
+mlruns/
+checkpoints/
+tb-logger/
+.vscode/
