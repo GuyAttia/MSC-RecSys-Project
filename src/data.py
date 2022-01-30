@@ -32,19 +32,19 @@ def get_netflix_ratings():
 
 def train_valid_test_split(df):
     """
-    Split the data into train, validation and test sets based on the timestamp.
+    Split the data into train, validation, test, and full-train sets based on the timestamp.
     """
     # Split to train and test by time
     first_test_ts = df['timestamp'].quantile(0.98)   # Get the 98 quantile of the time to cut the test set
-    df_train_tmp = df.loc[df['timestamp'] < first_test_ts]
+    df_full_train = df.loc[df['timestamp'] < first_test_ts]     # Will be used for training before the test predictions
     df_test = df.loc[df['timestamp'] >= first_test_ts]
 
     # Split the remaining train to train and valid by time
-    first_valid_ts = df_train_tmp['timestamp'].quantile(0.98)  # Get the 98 quantile of the remaining training time to cut the valid set
-    df_train = df_train_tmp.loc[df_train_tmp['timestamp'] < first_valid_ts]
-    df_valid = df_train_tmp.loc[df_train_tmp['timestamp'] >= first_valid_ts]
-    del df_train_tmp, df
-    return df_train, df_valid, df_test
+    first_valid_ts = df_full_train['timestamp'].quantile(0.98)  # Get the 98 quantile of the remaining training time to cut the valid set
+    df_train = df_full_train.loc[df_full_train['timestamp'] < first_valid_ts]
+    df_valid = df_full_train.loc[df_full_train['timestamp'] >= first_valid_ts]
+    del df
+    return df_train, df_valid, df_test, df_full_train
 
 
 def train_valid_test_split_autorec(df):
@@ -59,41 +59,48 @@ def train_valid_test_split_autorec(df):
 
 ### ----------------------------------------------------------------------- Processing -------------------------------------------------------------------------------- ###
 
-def remove_non_trained_users_items(df_train, df_valid, df_test):
+def remove_non_trained_users_items(df_train, df_valid, df_test, df_full_train=None):
     """
     Make sure non of the users & items appears only on the validation or test sets if we didn't trained on them.
     """
+    # Due to the way we split our data for AutoRec and VAE, we can actually use the validation set as our full train set.
+    if df_full_train is None:
+        df_full_train = df_valid.copy()
+
     # USERS
     # Remove USERS in valid and test sets that aren't present in the training set
     train_unique_users = df_train['user_id'].unique()
     valid_unique_users = df_valid['user_id'].unique()
     test_unique_users = df_test['user_id'].unique()
+    full_train_unique_users = df_full_train['user_id'].unique()
+    
     # Clean valid set
     valid_missing_in_train = set(valid_unique_users).difference(set(train_unique_users))
     df_valid = df_valid.loc[~df_valid['user_id'].isin(valid_missing_in_train)]
     # Clean test set
-    test_missing_in_train = set(test_unique_users).difference(set(train_unique_users))
+    test_missing_in_train = set(test_unique_users).difference(set(full_train_unique_users))
     df_test = df_test.loc[~df_test['user_id'].isin(test_missing_in_train)]
     # Validations - check we are ok
     assert(df_train['user_id'].nunique() >= df_valid['user_id'].nunique())
-    assert(df_train['user_id'].nunique() >= df_test['user_id'].nunique())
+    assert(df_full_train['user_id'].nunique() >= df_test['user_id'].nunique())
 
     # ITEMS
     # Remove ITEMS in valid and test sets that aren't present in the training set
     train_unique_items = df_train['item_id'].unique()
     valid_unique_items = df_valid['item_id'].unique()
     test_unique_items = df_test['item_id'].unique()
+    full_train_unique_items = df_full_train['item_id'].unique()
     # Clean valid set
     valid_missing_in_train = set(valid_unique_items).difference(set(train_unique_items))
     df_valid = df_valid.loc[~df_valid['item_id'].isin(valid_missing_in_train)]
     # Clean test set
-    test_missing_in_train = set(test_unique_items).difference(set(train_unique_items))
+    test_missing_in_train = set(test_unique_items).difference(set(full_train_unique_items))
     df_test = df_test.loc[~df_test['item_id'].isin(test_missing_in_train)]
     # Validations - check we are ok
     assert(df_train['item_id'].nunique() >= df_valid['item_id'].nunique())
-    assert(df_train['item_id'].nunique() >= df_test['item_id'].nunique())
+    assert(df_full_train['item_id'].nunique() >= df_test['item_id'].nunique())
     
-    return df_train, df_valid, df_test
+    return df_train, df_valid, df_test, df_full_train
 
 
 def create_ratings_matrix(ratings, df_train, df_valid, df_test):
@@ -149,18 +156,21 @@ def movielens_mf_dataloaders(batch_size:int = 128):
     Generate the DataLoader objects for MF with the defined batch size
     """
     ratings = get_movielens_ratings()
-    df_train, df_valid, df_test = train_valid_test_split(df=ratings)
-    df_train, df_valid, df_test = remove_non_trained_users_items(df_train, df_valid, df_test)
+    df_train, df_valid, df_test, df_full_train = train_valid_test_split(df=ratings)
+    df_train, df_valid, df_test, df_full_train = remove_non_trained_users_items(df_train, df_valid, df_test, df_full_train)
 
     ds_train = RatingDataset(df=df_train)
     ds_valid = RatingDataset(df=df_valid)
     ds_test = RatingDataset(df=df_test)
+    ds_full_train = RatingDataset(df=df_full_train)
 
     dl_train = DataLoader(dataset=ds_train, batch_size=batch_size, shuffle=True)
     dl_valid = DataLoader(dataset=ds_valid, batch_size=batch_size, shuffle=True)
     dl_test = DataLoader(dataset=ds_test, batch_size=batch_size, shuffle=True)
+    dl_full_train = DataLoader(dataset=ds_full_train, batch_size=batch_size, shuffle=True)
 
-    return dl_train, dl_valid, dl_test
+    return dl_train, dl_valid, dl_test, dl_full_train
+
 
 def netflix_mf_dataloaders(batch_size:int = 128):
     pass
@@ -198,7 +208,7 @@ def movielens_dataloaders(by_user:bool = True, batch_size:int = 128):
     df_train_tmp, df_test = train_valid_test_split_autorec(df=ratings)
     df_train, df_valid = train_valid_test_split_autorec(df=df_train_tmp)
 
-    df_train, df_valid, df_test = remove_non_trained_users_items(df_train, df_valid, df_test)
+    df_train, df_valid, df_test, _ = remove_non_trained_users_items(df_train, df_valid, df_test)
     ratings_train, ratings_valid, ratings_test = create_ratings_matrix(ratings, df_train, df_valid, df_test)
 
     ds_train = VectorsDataSet(ratings_matrix=ratings_train, by_user=by_user)
@@ -208,8 +218,10 @@ def movielens_dataloaders(by_user:bool = True, batch_size:int = 128):
     dl_train = DataLoader(dataset=ds_train, batch_size=batch_size, shuffle=True)
     dl_valid = DataLoader(dataset=ds_valid, batch_size=batch_size, shuffle=True)
     dl_test = DataLoader(dataset=ds_test, batch_size=batch_size, shuffle=True)
+    dl_full_train = DataLoader(dataset=ds_valid, batch_size=batch_size, shuffle=True)
 
-    return dl_train, dl_valid, dl_test
+    return dl_train, dl_valid, dl_test, dl_full_train
+
 
 def netflix_dataloaders(by_user:bool = True, batch_size:int = 128):
     pass
