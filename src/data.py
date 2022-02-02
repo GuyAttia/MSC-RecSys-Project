@@ -4,7 +4,7 @@ from os import path
 from torch.utils.data import DataLoader, Dataset
 from torch import tensor
 
-from src.download_data import download_movielens_dataset
+from src.download_data import download_movielens_dataset, download_netflix_dataset, netflix_build_rating_table
 
 ### ----------------------------------------------------------------------- Get Data -------------------------------------------------------------------------------- ###
 
@@ -26,8 +26,14 @@ def get_movielens_ratings():
     return ratings
 
 def get_netflix_ratings():
-    pass
+    # Download the data from web
+    download_netflix_dataset()
 
+    # Load the rating csv
+    ratings = netflix_build_rating_table()
+    return ratings
+    
+    
 ### ----------------------------------------------------------------------- Split Data -------------------------------------------------------------------------------- ###
 
 def train_valid_test_split(df):
@@ -225,3 +231,4 @@ def movielens_dataloaders(by_user:bool = True, batch_size:int = 128):
 
 def netflix_dataloaders(by_user:bool = True, batch_size:int = 128):
     pass
+

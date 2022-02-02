@@ -10,3 +10,4 @@ dependencies:
   - matplotlib=3.5.0
   - ignite=0.4.8
   - optuna=2.10.0
+  - tqdm=4.62.3
