@@ -155,6 +155,9 @@ class RatingDataset(Dataset):
 
     def __len__(self):
         return self.num_samples
+    
+    def get_all_data(self):
+        return self.users, self.items, self.labels
 
 
 def movielens_mf_dataloaders(batch_size:int = 128):
@@ -187,7 +190,7 @@ class VectorsDataSet(Dataset):
     """
     Generate vectors dataset to use in the AutoRec and VAE models, where each sample should be a user / item vector
     """
-    def __init__(self, ratings_matrix, by_user=True) -> None:
+    def __init__(self, ratings_matrix, by_user=False) -> None:
         self.data = tensor(ratings_matrix.values).float()
         self.by_user = by_user  # If we want we can use this variable to generate DataSets for User / Item AutoRec
 
@@ -203,9 +206,15 @@ class VectorsDataSet(Dataset):
             return self.data.shape[0]
         else:
             return self.data.shape[1]
+    
+    def get_all_data(self):
+        if self.by_user:
+            return self.data
+        else:
+            return self.data.T
 
 
-def movielens_dataloaders(by_user:bool = True, batch_size:int = 128):
+def movielens_dataloaders(by_user:bool = False, batch_size:int = 128):
     """
     Generate the DataLoader objects for AutoRec and VAE models with the defined batch size
     """
@@ -229,6 +238,6 @@ def movielens_dataloaders(by_user:bool = True, batch_size:int = 128):
     return dl_train, dl_valid, dl_test, dl_full_train
 
 
-def netflix_dataloaders(by_user:bool = True, batch_size:int = 128):
+def netflix_dataloaders(by_user:bool = False, batch_size:int = 128):
     pass
 
