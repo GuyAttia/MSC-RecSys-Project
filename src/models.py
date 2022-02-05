@@ -141,12 +141,9 @@ class VAE(nn.Module):
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
-        if self.training:
-            std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(std)
-            return eps.mul(std).add_(mu)
-        else:
-            return mu
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return eps.mul(std).add_(mu)
     
     def decode(self, z):
         h = z
@@ -178,3 +175,27 @@ class VAE(nn.Module):
 
             # Normal Initialization for Biases
             layer.bias.data.normal_(0.0, 0.001)
+
+
+def get_model(model_name, params, dl_train):
+    """
+    Instantiate the proper model based on the model_name parameter. 
+    Use the needed hyperparameters from params.
+    Also, extract the needed data dimensions for building the models.
+    """
+    model = None
+
+    if model_name == 'MF':
+        num_users = dl_train.dataset.num_users
+        num_items = dl_train.dataset.num_items
+        model = MF(num_users=num_users, num_items=num_items, params=params)
+    elif model_name == 'AutoRec':
+        n_dim = dl_train.dataset.__getitem__(1).shape[0]
+        linear_encoder = EncoderLinear(in_dim=n_dim, params=params)
+        linear_decoder = DecoderLinear(out_dim=n_dim, params=params)
+        model = AutoRec(encoder=linear_encoder, decoder=linear_decoder)
+    elif model_name == 'VAE':
+        n_dim = dl_train.dataset.__getitem__(1).shape[0]
+        p_dims = [200, 600, n_dim]
+        model = VAE(p_dims=p_dims)
+    return model

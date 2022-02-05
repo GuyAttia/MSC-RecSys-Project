@@ -23,6 +23,7 @@ def get_movielens_ratings():
         names=['user_id','item_id','rating','timestamp'],
         engine='python')
     
+    ratings['timestamp'] = pd.to_datetime(ratings['timestamp'])
     return ratings
 
 def get_netflix_ratings():
@@ -31,6 +32,7 @@ def get_netflix_ratings():
 
     # Load the rating csv
     ratings = netflix_build_rating_table()
+    ratings['timestamp'] = pd.to_datetime(ratings['timestamp'])
     return ratings
     
     
@@ -160,11 +162,15 @@ class RatingDataset(Dataset):
         return self.users, self.items, self.labels
 
 
-def movielens_mf_dataloaders(batch_size:int = 128):
+def mf_dataloaders(dataset_name, batch_size:int = 128):
     """
     Generate the DataLoader objects for MF with the defined batch size
     """
-    ratings = get_movielens_ratings()
+    if dataset_name == 'movielens':
+        ratings = get_movielens_ratings()
+    else:
+        ratings = get_netflix_ratings()
+        
     df_train, df_valid, df_test, df_full_train = train_valid_test_split(df=ratings)
     df_train, df_valid, df_test, df_full_train = remove_non_trained_users_items(df_train, df_valid, df_test, df_full_train)
 
@@ -179,10 +185,6 @@ def movielens_mf_dataloaders(batch_size:int = 128):
     dl_full_train = DataLoader(dataset=ds_full_train, batch_size=batch_size, shuffle=True)
 
     return dl_train, dl_valid, dl_test, dl_full_train
-
-
-def netflix_mf_dataloaders(batch_size:int = 128):
-    pass
 
 ### ----------------------------------------------------------------------- AutoRec & VAE -------------------------------------------------------------------------------- ###
 
@@ -214,11 +216,14 @@ class VectorsDataSet(Dataset):
             return self.data.T
 
 
-def movielens_dataloaders(by_user:bool = False, batch_size:int = 128):
+def dataloaders(dataset_name, by_user:bool = False, batch_size:int = 128):
     """
     Generate the DataLoader objects for AutoRec and VAE models with the defined batch size
     """
-    ratings = get_movielens_ratings()
+    if dataset_name == 'movielens':
+        ratings = get_movielens_ratings()
+    else:
+        ratings = get_netflix_ratings()
 
     df_train_tmp, df_test = train_valid_test_split_autorec(df=ratings)
     df_train, df_valid = train_valid_test_split_autorec(df=df_train_tmp)
@@ -238,6 +243,13 @@ def movielens_dataloaders(by_user:bool = False, batch_size:int = 128):
     return dl_train, dl_valid, dl_test, dl_full_train
 
 
-def netflix_dataloaders(by_user:bool = False, batch_size:int = 128):
-    pass
+def get_data(model_name, dataset_name, batch_size):
+    if model_name == 'MF':
+            dl_train, dl_valid, dl_test, dl_full_train = mf_dataloaders(dataset_name=dataset_name, batch_size=batch_size)
+    else:
+            dl_train, dl_valid, dl_test, dl_full_train = dataloaders(dataset_name=dataset_name, batch_size=batch_size)
+    return dl_train, dl_valid, dl_test, dl_full_train
 
+## For testing only
+if __name__ == '__main__':
+    dl_ml_train, dl_ml_valid, dl_ml_test, dl_ml_full_train = dataloaders(dataset_name='movielens', batch_size=128)
