@@ -171,7 +171,7 @@ if __name__ == '__main__':
         'dropout': 0.2,
         'batch_size': 512
     }
-    dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'])
+    dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'], device=device)
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
     test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)

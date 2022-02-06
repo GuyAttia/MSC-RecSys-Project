@@ -27,7 +27,7 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
         users, items, y = batch
         users.to(device)
         items.to(device)
-        y = y.float()
+        y = y.float().to(device)
 
         model.train()
         y_pred = model(users, items)
@@ -51,6 +51,7 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
             users, items, y = batch
             users.to(device)
             items.to(device)
+            y.to(device)
             y_pred = model(users, items)
             return y_pred, y
     
@@ -65,7 +66,7 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
             users.to(device)
             items.to(device)
             y_pred = model(users, items)
-            y_stack = torch.stack([users, items, y])
+            y_stack = torch.stack([users, items, y]).to(device)
             return y_pred, y_stack
 
     # Generate training and validation evaluators to print results during running
@@ -173,7 +174,7 @@ if __name__ == '__main__':
         'latent_dim': 200,
         'batch_size': 512
     }
-    dl_train, _, dl_test, _ = mf_dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'])
+    dl_train, _, dl_test, _ = mf_dataloaders(dataset_name=dataset_name, device=device, batch_size=best_params['batch_size'])
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
     test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)

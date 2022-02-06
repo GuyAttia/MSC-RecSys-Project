@@ -141,10 +141,10 @@ class RatingDataset(Dataset):
     """
     Generate rating dataset to use in the MF model, where each sample should be a tuple of (user, item, rating)
     """
-    def __init__(self, df):
+    def __init__(self, df, device):
         self.num_samples = len(df)
-        self.users = tensor(df['user_id'].values)
-        self.items = tensor(df['item_id'].values)
+        self.users = tensor(df['user_id'].values).to(device)
+        self.items = tensor(df['item_id'].values).to(device)
         self.labels = tensor(df['rating'].values).float()
         self.num_users = df['user_id'].max()
         self.num_items = df['item_id'].max()
@@ -162,7 +162,7 @@ class RatingDataset(Dataset):
         return self.users, self.items, self.labels
 
 
-def mf_dataloaders(dataset_name, batch_size:int = 128):
+def mf_dataloaders(dataset_name, device, batch_size:int = 128):
     """
     Generate the DataLoader objects for MF with the defined batch size
     """
@@ -174,10 +174,10 @@ def mf_dataloaders(dataset_name, batch_size:int = 128):
     df_train, df_valid, df_test, df_full_train = train_valid_test_split(df=ratings)
     df_train, df_valid, df_test, df_full_train = remove_non_trained_users_items(df_train, df_valid, df_test, df_full_train)
 
-    ds_train = RatingDataset(df=df_train)
-    ds_valid = RatingDataset(df=df_valid)
-    ds_test = RatingDataset(df=df_test)
-    ds_full_train = RatingDataset(df=df_full_train)
+    ds_train = RatingDataset(df=df_train, device=device)
+    ds_valid = RatingDataset(df=df_valid, device=device)
+    ds_test = RatingDataset(df=df_test, device=device)
+    ds_full_train = RatingDataset(df=df_full_train, device=device)
 
     dl_train = DataLoader(dataset=ds_train, batch_size=batch_size, shuffle=True)
     dl_valid = DataLoader(dataset=ds_valid, batch_size=batch_size, shuffle=True)
@@ -192,8 +192,8 @@ class VectorsDataSet(Dataset):
     """
     Generate vectors dataset to use in the AutoRec and VAE models, where each sample should be a user / item vector
     """
-    def __init__(self, ratings_matrix, by_user=False) -> None:
-        self.data = tensor(ratings_matrix.values).float()
+    def __init__(self, ratings_matrix, device, by_user=False) -> None:
+        self.data = tensor(ratings_matrix.values).float().to(device)
         self.by_user = by_user  # If we want we can use this variable to generate DataSets for User / Item AutoRec
 
     def __getitem__(self, index: int):
@@ -216,7 +216,7 @@ class VectorsDataSet(Dataset):
             return self.data.T
 
 
-def dataloaders(dataset_name, by_user:bool = False, batch_size:int = 128):
+def dataloaders(dataset_name, device, by_user:bool = False, batch_size:int = 128):
     """
     Generate the DataLoader objects for AutoRec and VAE models with the defined batch size
     """
@@ -231,9 +231,9 @@ def dataloaders(dataset_name, by_user:bool = False, batch_size:int = 128):
     df_train, df_valid, df_test, _ = remove_non_trained_users_items(df_train, df_valid, df_test)
     ratings_train, ratings_valid, ratings_test = create_ratings_matrix(ratings, df_train, df_valid, df_test)
 
-    ds_train = VectorsDataSet(ratings_matrix=ratings_train, by_user=by_user)
-    ds_valid = VectorsDataSet(ratings_matrix=ratings_valid, by_user=by_user)
-    ds_test = VectorsDataSet(ratings_matrix=ratings_test, by_user=by_user)
+    ds_train = VectorsDataSet(ratings_matrix=ratings_train, by_user=by_user, device=device)
+    ds_valid = VectorsDataSet(ratings_matrix=ratings_valid, by_user=by_user, device=device)
+    ds_test = VectorsDataSet(ratings_matrix=ratings_test, by_user=by_user, device=device)
 
     dl_train = DataLoader(dataset=ds_train, batch_size=batch_size, shuffle=True)
     dl_valid = DataLoader(dataset=ds_valid, batch_size=batch_size, shuffle=True)
@@ -243,13 +243,13 @@ def dataloaders(dataset_name, by_user:bool = False, batch_size:int = 128):
     return dl_train, dl_valid, dl_test, dl_full_train
 
 
-def get_data(model_name, dataset_name, batch_size):
+def get_data(model_name, dataset_name, batch_size, device):
     if model_name == 'MF':
-            dl_train, dl_valid, dl_test, dl_full_train = mf_dataloaders(dataset_name=dataset_name, batch_size=batch_size)
+            dl_train, dl_valid, dl_test, dl_full_train = mf_dataloaders(dataset_name=dataset_name, batch_size=batch_size, device=device)
     else:
-            dl_train, dl_valid, dl_test, dl_full_train = dataloaders(dataset_name=dataset_name, batch_size=batch_size)
+            dl_train, dl_valid, dl_test, dl_full_train = dataloaders(dataset_name=dataset_name, batch_size=batch_size, device=device)
     return dl_train, dl_valid, dl_test, dl_full_train
 
 ## For testing only
 if __name__ == '__main__':
-    dl_ml_train, dl_ml_valid, dl_ml_test, dl_ml_full_train = dataloaders(dataset_name='movielens', batch_size=128)
+    dl_ml_train, dl_ml_valid, dl_ml_test, dl_ml_full_train = dataloaders(dataset_name='movielens', batch_size=128, device='cpu')

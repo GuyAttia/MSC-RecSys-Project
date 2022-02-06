@@ -72,7 +72,7 @@ def tune_params(model_name, dataset_name, n_trials, max_epochs, device):
             }
     
         # params = params_dict[dataset_name][model_name]  # Get the relevant params range by the dataset and model
-        dl_train, dl_valid, _, _ = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=params['batch_size'])
+        dl_train, dl_valid, _, _ = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=params['batch_size'], device=device)
         model = get_model(model_name, params, dl_train)  # Build model
         optimizer = getattr(optim, params['optimizer'])(model.parameters(), lr= params['learning_rate'])  # Instantiate optimizer
         valid_loss, _ = train(model_name, model, optimizer, max_epochs, dl_train, dl_valid, device, dataset_name)  # Train the model and calc the validation loss
@@ -132,7 +132,7 @@ def final_train(model_name, dataset_name, best_params, max_epochs, device):
     - Train the final model on the train+validation data sets (full_train)
     - Test it against the test set for final results
     """
-    _, _, dl_test, dl_full_train = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=best_params['batch_size'])
+    _, _, dl_test, dl_full_train = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=best_params['batch_size'], device=device)
     model = get_model(model_name, best_params, dl_full_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
     # Train the model on the full_train (train+valid) set and calc the test loss
