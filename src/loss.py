@@ -16,7 +16,7 @@ class RMSELoss(nn.Module):
         self.mse = nn.MSELoss()
         self.eps = eps
         
-    def forward(self, yhat, y):
+    def forward(self, yhat, y, **kwargs):
         loss = torch.sqrt(self.mse(yhat, y) + self.eps)
         return loss
 
@@ -31,7 +31,7 @@ class NON_ZERO_RMSELoss(nn.Module):
         self.mse = nn.MSELoss()
         self.eps = eps  # Add eps to avoid devision by 0
         
-    def forward(self, yhat, y):
+    def forward(self, yhat, y, **kwargs):
         # Create mask for all non zero items in the tensor
         non_zero_mask = torch.nonzero(y, as_tuple=True)
         y_non_zeros = y[non_zero_mask]  # Keep only non zero in y

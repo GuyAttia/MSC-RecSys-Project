@@ -40,49 +40,38 @@ def tune_params(model_name, dataset_name, n_trials, max_epochs, device):
     """
     
     def objective(trial):
-        # Define all hyperparams range options (for different datasets and models)
-        params_dict = {
-            'movielens': {
-                'MF': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'latent_dim': trial.suggest_int("latent_dim", 10, 20),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                },
-                'AutoRec': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'latent_dim': trial.suggest_int("latent_dim", 10, 20),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                },
-                'VAE': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                }
-            },
-            'netflix': {
-                'MF': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'latent_dim': trial.suggest_int("latent_dim", 10, 20),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                },
-                'AutoRec': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'latent_dim': trial.suggest_int("latent_dim", 10, 20),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                },
-                'VAE': {
-                    'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
-                    'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                    'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
-                }
+        if model_name == 'MF':
+            params = {
+                # 'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
+                'learning_rate': trial.suggest_categorical('learning_rate', [0.001, 0.01, 0.1, 1]),
+                'optimizer': trial.suggest_categorical("optimizer", ["SGD"]),
+                # 'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
+                # 'latent_dim': trial.suggest_int("latent_dim", 10, 20),
+                'latent_dim': trial.suggest_categorical("latent_dim", [10, 40, 100, 300, 500]),
+                'batch_size': trial.suggest_categorical("batch_size", [512])
             }
-        }
-        
-        params = params_dict[dataset_name][model_name]  # Get the relevant params range by the dataset and model
+        elif model_name == 'AutoRec':
+            params = {
+                # 'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1e-1),
+                'learning_rate': trial.suggest_categorical('learning_rate', [0.001, 0.01, 0.1, 1]),
+                # 'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
+                'optimizer': trial.suggest_categorical("optimizer", ["RMSprop"]),
+                # 'optimizer': trial.suggest_categorical("optimizer", ["RMSprop"]),
+                # 'latent_dim': trial.suggest_int("latent_dim", 10, 20),
+                'latent_dim': trial.suggest_categorical("latent_dim", [10, 40, 100, 300, 500]),
+                'batch_size': trial.suggest_categorical("batch_size", [512])
+            }
+        elif model_name == 'VAE':
+            params = {
+                'learning_rate': trial.suggest_categorical('learning_rate', [0.0001, 0.001, 0.01, 0.1]),
+                'activation_func': trial.suggest_categorical('activation_func', ['tanh', 'relu', 'selu']),
+                'p_dims': trial.suggest_categorical('p_dims', [[200, 600], [250, 500]]),
+                'optimizer': trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
+                'dropout': trial.suggest_float('dropout', 0.2, 0.5),
+                'batch_size': trial.suggest_categorical("batch_size", [128, 256, 512])
+            }
+    
+        # params = params_dict[dataset_name][model_name]  # Get the relevant params range by the dataset and model
         dl_train, dl_valid, _, _ = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=params['batch_size'])
         model = get_model(model_name, params, dl_train)  # Build model
         optimizer = getattr(optim, params['optimizer'])(model.parameters(), lr= params['learning_rate'])  # Instantiate optimizer
@@ -128,12 +117,15 @@ def calc_final_mrr(model_name, model, dl_test):
             y_preds = model(x)
 
         # In AutoRec & VAE the predictions are already in the shape of rating matrixs so no need in processing
-        mrr_ = mrr(pred=y_preds.numpy(), actual=y_test.numpy(), cutoff=5, mrr_threshold=4)
+        if model_name == 'AutoRec':
+            mrr_ = mrr(pred=y_preds.numpy(), actual=y_test.numpy(), cutoff=5, mrr_threshold=4)
+        elif model_name == 'VAE':
+            mrr_ = mrr(pred=y_preds[0].numpy(), actual=y_test.numpy(), cutoff=5, mrr_threshold=4)
     
     return mrr_
 
 
-def final_train(model_name, dataset_name, best_params, max_epochs, dl_full_train, dl_test, device):
+def final_train(model_name, dataset_name, best_params, max_epochs, device):
     """
     After we optimized and choosed the best hyperparameters for the model we want to prepare it for predicting the test set.
     - Use the best hyperparameters to build the final model
@@ -153,20 +145,30 @@ def final_train(model_name, dataset_name, best_params, max_epochs, dl_full_train
 
 #### Only for testing
 if __name__ == '__main__':
-    import torch
-    from src.hyperparams_tuning import *
-    from src.data import *
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataset_name = 'movielens'
-    best_params = {'batch_size': 128, 'learning_rate': 0.001, 'optimizer': 'Adam'}
     max_epochs = 2
-    model_name = 'MF' #'AutoRec' # 'MF'
+    n_trials = 2
+    model_name = 'VAE' #'AutoRec' # 'MF' # "VAE"
 
-    dl_train, dl_valid, dl_test, dl_full_train = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=best_params['batch_size'])
-    model = get_model(model_name, best_params, dl_train)  # Build model
-    optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss, final_model, mrr_ = final_train(model_name, dataset_name, best_params, max_epochs, device)
-    print(test_loss)
-    print(final_model)
-    print(mrr_)
+    study_ml, df_tuning_results = tune_params(
+    model_name=model_name, 
+    dataset_name=dataset_name, 
+    max_epochs=max_epochs,
+    n_trials=n_trials, 
+    device=device
+    )
+
+    best_params = study_ml.best_params
+    print(f'Best params: {best_params}')
+    print(df_tuning_results.sort_values(by='value').head(15))
+
+    # Full train
+    test_loss, final_model, test_mrr = final_train(
+        model_name=model_name, 
+        dataset_name=dataset_name, 
+        best_params=best_params,
+        max_epochs=max_epochs, 
+        device=device
+    )
+    print(f'Final test loss = {test_loss}\nFinal test MRR = {test_mrr}')

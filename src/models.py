@@ -35,18 +35,20 @@ class EncoderLinear(nn.Module):
         super().__init__()
         # Get relevant hyperparameters from the params dict
         latent_dim = params.get('latent_dim', 10)
-        layers_sizes = params.get('layers_sizes', [512, 256])
+        layers_sizes = params.get('layers_sizes', [500, 250])
         layers_sizes.insert(0, in_dim)   # Insert the input dimension
 
         # Add deep layers
         modules = []
         for i in range(len(layers_sizes) - 1):
             modules.append(nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
-            modules.append(nn.ReLU())
+            # modules.append(nn.ReLU())
+            # modules.append(nn.Identity())
 
         # Add last layer for Z
         modules.append(nn.Linear(layers_sizes[-1], latent_dim, bias=True))
-        modules.append(nn.ReLU())
+        # modules.append(nn.ReLU())
+        # modules.append(nn.Identity())
         
         # Generate the layers sequence foe easier implementation
         self.seq = nn.Sequential(*modules)
@@ -63,18 +65,20 @@ class DecoderLinear(nn.Module):
         super().__init__()
         # Get relevant hyperparameters from the params dict
         latent_dim = params.get('latent_dim', 10)
-        layers_sizes = params.get('layers_sizes', [256, 512])
+        layers_sizes = params.get('layers_sizes', [250, 500])
         layers_sizes.append(out_dim)   # append the output dimension
 
         modules = []
         # Add last layer for Z
         modules.append(nn.Linear(latent_dim, layers_sizes[0], bias=True))
-        modules.append(nn.ReLU())
+        # modules.append(nn.ReLU())
+        modules.append(nn.Sigmoid())
 
         # Add deep layers
         for i in range(len(layers_sizes) - 1):
             modules.append(nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
-            modules.append(nn.ReLU())
+            # modules.append(nn.ReLU())
+            modules.append(nn.Sigmoid())
 
         # Generate the layers sequence foe easier implementation
         self.seq = nn.Sequential(*modules)
@@ -102,15 +106,20 @@ class VAE(nn.Module):
     """
     VAE model implementation
     """
-    def __init__(self, p_dims, q_dims=None, dropout=0.5):
+    def __init__(self, n_dim, params):
         super().__init__()
-        self.p_dims = p_dims
+        self.p_dims = params.get('p_dims', [250, 500]).copy()
+        self.p_dims.append(n_dim)
+        self.activation_func = params.get('activation_func', 'tanh')
+        dropout = params.get('dropout', 0.5)
+        q_dims = params.get('q_dims', None)
+
         if q_dims:
-            assert q_dims[0] == p_dims[-1], "In and Out dimensions must equal to each other"
-            assert q_dims[-1] == p_dims[0], "Latent dimension for p- and q- network mismatches."
+            assert q_dims[0] == self.p_dims[-1], "In and Out dimensions must equal to each other"
+            assert q_dims[-1] == self.p_dims[0], "Latent dimension for p- and q- network mismatches."
             self.q_dims = q_dims
         else:
-            self.q_dims = p_dims[::-1]
+            self.q_dims = self.p_dims[::-1]
 
         # Last dimension of q- network is for mean and variance
         temp_q_dims = self.q_dims[:-1] + [self.q_dims[-1] * 2]
@@ -134,7 +143,12 @@ class VAE(nn.Module):
         for i, layer in enumerate(self.q_layers):
             h = layer(h)
             if i != len(self.q_layers) - 1:
-                h = torch.tanh(h)
+                if self.activation_func == 'tanh':
+                    h = torch.tanh(h)
+                elif self.activation_func == 'relu':
+                    h = torch.relu(h)
+                elif self.activation_func == 'selu':
+                    h = torch.selu(h)
             else:
                 mu = h[:, :self.q_dims[-1]]
                 logvar = h[:, self.q_dims[-1]:]
@@ -150,7 +164,12 @@ class VAE(nn.Module):
         for i, layer in enumerate(self.p_layers):
             h = layer(h)
             if i != len(self.p_layers) - 1:
-                h = torch.tanh(h)
+                if self.activation_func == 'tanh':
+                    h = torch.tanh(h)
+                elif self.activation_func == 'relu':
+                    h = torch.relu(h)
+                elif self.activation_func == 'selu':
+                    h = torch.selu(h)
         return h
 
     def init_weights(self):
@@ -196,6 +215,5 @@ def get_model(model_name, params, dl_train):
         model = AutoRec(encoder=linear_encoder, decoder=linear_decoder)
     elif model_name == 'VAE':
         n_dim = dl_train.dataset.__getitem__(1).shape[0]
-        p_dims = [200, 600, n_dim]
-        model = VAE(p_dims=p_dims)
+        model = VAE(n_dim=n_dim, params=params)
     return model

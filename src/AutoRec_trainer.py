@@ -131,7 +131,7 @@ def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_tes
         tag="training",
         output_transform=lambda loss: {"batch_loss": loss},
     )
-    for tag, evaluator in [("training", train_evaluator), ("validation", val_evaluator)]:
+    for tag, evaluator in [("training", train_evaluator), ("validation", val_evaluator), ("mrr_validation", val_mrr_evaluator)]:
         tb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
@@ -139,14 +139,6 @@ def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_tes
             metric_names="all",
             global_step_transform=global_step_from_engine(trainer),
         )
-
-    tb_logger.attach_output_handler(
-        val_mrr_evaluator,
-        event_name=Events.EPOCH_COMPLETED,
-        tag="mrr_validation",
-        metric_names='all',
-        global_step_transform=global_step_from_engine(trainer),
-    )
 
     # Run the trainer
     trainer.run(dl_train, max_epochs=max_epochs)
@@ -164,14 +156,16 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataset_name = 'movielens'
-    dl_train, _, dl_test, _ = movielens_mf_dataloaders(batch_size=128)
 
-    MAX_EPOCHS = 2
+    max_epochs = 2
     model_name = 'AutoRec'
     best_params = {
         'learning_rate': 0.001, 
-        'optimizer': "RMSprop"
+        'optimizer': "RMSprop",
+        'latent_dim': 200,
+        'batch_size': 512
     }
+    dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'])
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss = train(model_name, model, optimizer, MAX_EPOCHS, dl_train, dl_test, device, dataset_name)
+    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)

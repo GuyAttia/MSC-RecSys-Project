@@ -17,6 +17,7 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
     """
     model = model.to(device)
     criterion = VAE_Loss()
+    criterion2 = NON_ZERO_RMSELoss()
 
     def train_step(engine, batch):
         """
@@ -66,7 +67,8 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
 
     # Generate training and validation evaluators to print results during running
     val_metrics = {
-        "loss": Loss(criterion)
+        "loss": Loss(criterion),
+        'rmse_loss': Loss(criterion2)
     }
     mrr_metric = MetricMRR_Vec()
 
@@ -76,6 +78,7 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
     # Attach metrics to the evaluators
     val_metrics['loss'].attach(train_evaluator, 'loss')
     val_metrics['loss'].attach(val_evaluator, 'loss')
+    val_metrics['rmse_loss'].attach(val_evaluator, 'rmse_loss')
     mrr_metric.attach(val_mrr_evaluator, 'mrr')
 
     # Attach logger to print the training loss after each epoch
@@ -90,7 +93,7 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
     def log_validation_results(trainer):
         val_evaluator.run(dl_test)
         metrics = val_evaluator.state.metrics
-        print(f"Validation Results - Epoch[{trainer.state.epoch}] Avg loss: {metrics['loss']:.2f}")
+        print(f"Validation Results - Epoch[{trainer.state.epoch}] Avg loss: {metrics['loss']:.2f}  |  Avg RMSE: {metrics['rmse_loss']:.2f}")
 
     # Attach logger to print the validation loss after each epoch
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -132,7 +135,7 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
         tag="training",
         output_transform=lambda loss: {"batch_loss": loss},
     )
-    for tag, evaluator in [("training", train_evaluator), ("validation", val_evaluator)]:
+    for tag, evaluator in [("training", train_evaluator), ("validation", val_evaluator), ('mrr_validation', val_mrr_evaluator)]:
         tb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
@@ -140,14 +143,6 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
             metric_names="all",
             global_step_transform=global_step_from_engine(trainer),
         )
-
-    tb_logger.attach_output_handler(
-        val_mrr_evaluator,
-        event_name=Events.EPOCH_COMPLETED,
-        tag="mrr_validation",
-        metric_names='all',
-        global_step_transform=global_step_from_engine(trainer),
-    )
 
     # Run the trainer
     trainer.run(dl_train, max_epochs=max_epochs)
@@ -165,14 +160,18 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataset_name = 'movielens'
-    dl_train, _, dl_test, _ = movielens_dataloaders(batch_size=128)
 
-    MAX_EPOCHS = 2
+    max_epochs = 2
     model_name = 'VAE'
     best_params = {
-        'learning_rate': 0.001, 
-        'optimizer': "RMSprop"
+        'learning_rate': 0.001,
+        'p_dims': [200, 600],
+        'activation_func': 'relu',
+        'optimizer': "RMSprop",
+        'dropout': 0.2,
+        'batch_size': 512
     }
+    dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'])
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss = train(model_name, model, optimizer, MAX_EPOCHS, dl_train, dl_test, device, dataset_name)
+    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)
