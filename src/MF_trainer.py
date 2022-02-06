@@ -27,10 +27,10 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
         users, items, y = batch
         users.to(device)
         items.to(device)
-        y = y.float().to(device)
+        y = y.float().to('cpu')
 
         model.train()
-        y_pred = model(users, items)
+        y_pred = model(users, items).to('cpu')
         loss = criterion(y_pred, y)
 
         # Backpropagation
@@ -51,8 +51,8 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
             users, items, y = batch
             users.to(device)
             items.to(device)
-            y.to(device)
-            y_pred = model(users, items)
+            y.to('cpu')
+            y_pred = model(users, items).to('cpu')
             return y_pred, y
     
     def validation_step_mrr(engine, batch):
@@ -63,10 +63,10 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
 
         with torch.no_grad():
             users, items, y = batch
-            users.to(device)
-            items.to(device)
-            y_pred = model(users, items)
-            y_stack = torch.stack([users, items, y]).to(device)
+            y_pred = model(users, items).to('cpu')
+            users_mrr = torch.clone(users.detach()).to('cpu')
+            items_mrr = torch.clone(items.detach()).to('cpu')
+            y_stack = torch.stack([users_mrr, items_mrr, y])
             return y_pred, y_stack
 
     # Generate training and validation evaluators to print results during running

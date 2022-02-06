@@ -103,9 +103,13 @@ def calc_final_mrr(model_name, model, dl_test):
 
         # Prepare full rating matrixs for the MRR calculation
         # True rating matrix
+        test_users = torch.clone(test_users.detach()).to('cpu')
+        test_items = torch.clone(test_items.detach()).to('cpu')
+        y_test = torch.clone(y_test.detach()).to('cpu')
         df_true = pd.DataFrame({'user_id': test_users, 'item_id': test_items, 'rating': y_test})
         ratings_true = df_true.pivot(index = 'user_id', columns ='item_id', values = 'rating').fillna(0)
         # Predicted rating matrix
+        y_preds = torch.clone(y_preds.detach()).to('cpu')
         df_preds = pd.DataFrame({'user_id': test_users, 'item_id': test_items, 'rating': y_preds})
         ratings_preds = df_preds.pivot(index = 'user_id', columns ='item_id', values = 'rating').fillna(0)
         mrr_ = mrr(pred=ratings_preds.values, actual=ratings_true.values, cutoff=5, mrr_threshold=4)
