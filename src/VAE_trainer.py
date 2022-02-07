@@ -63,7 +63,9 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
             x.to(device)
             recon_x, mu, logvar  = model(x)
             kwargs = {'mu': mu, 'logvar': logvar}
-            return recon_x, y, kwargs
+            recon_x_mrr = torch.clone(recon_x.detach()).to('cpu')
+            y_mrr = torch.clone(y.detach()).to('cpu')
+            return recon_x_mrr, y_mrr, kwargs
 
     # Generate training and validation evaluators to print results during running
     val_metrics = {
