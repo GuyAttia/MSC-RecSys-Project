@@ -61,7 +61,9 @@ def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_tes
             x = y = batch
             x.to(device)
             y_pred = model(x)
-            return y_pred, y
+            y_pred_mrr = torch.clone(y_pred.detach()).to('cpu')
+            y_mrr = torch.clone(y.detach()).to('cpu')
+            return y_pred_mrr, y_mrr
 
     # Generate training and validation evaluators to print results during running
     val_metrics = {

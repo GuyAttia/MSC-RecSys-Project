@@ -96,7 +96,6 @@ class MetricMRR_Vec(Metric):
 
     def update(self, output):
         batch_y_preds, batch_y_test = output[0].detach(), output[1].detach()
-        
         self.df_test = torch.cat((self.df_test, batch_y_test), 0)
         self.df_preds = torch.cat((self.df_preds, batch_y_preds), 0)
 

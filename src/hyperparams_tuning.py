@@ -122,9 +122,9 @@ def calc_final_mrr(model_name, model, dl_test):
 
         # In AutoRec & VAE the predictions are already in the shape of rating matrixs so no need in processing
         if model_name == 'AutoRec':
-            mrr_ = mrr(pred=y_preds.numpy(), actual=y_test.numpy(), cutoff=5, mrr_threshold=4)
+            mrr_ = mrr(pred=y_preds.cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=4)
         elif model_name == 'VAE':
-            mrr_ = mrr(pred=y_preds[0].numpy(), actual=y_test.numpy(), cutoff=5, mrr_threshold=4)
+            mrr_ = mrr(pred=y_preds[0].cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=4)
     
     return mrr_
 
