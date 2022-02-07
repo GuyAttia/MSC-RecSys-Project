@@ -157,7 +157,7 @@ if __name__ == '__main__':
     from src.data import *
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dataset_name = 'movielens'
+    dataset_name = 'books' #'movielens'
 
     max_epochs = 2
     model_name = 'AutoRec'

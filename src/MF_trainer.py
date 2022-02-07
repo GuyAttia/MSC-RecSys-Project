@@ -164,14 +164,14 @@ if __name__ == '__main__':
     from src.data import *
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dataset_name = 'movielens'
+    dataset_name = 'books' # 'movielens'
 
     max_epochs = 2
     model_name = 'MF'
     best_params = {
         'learning_rate': 0.001, 
         'optimizer': "RMSprop",
-        'latent_dim': 200,
+        'latent_dim': 20,
         'batch_size': 512
     }
     dl_train, _, dl_test, _ = mf_dataloaders(dataset_name=dataset_name, device=device, batch_size=best_params['batch_size'])

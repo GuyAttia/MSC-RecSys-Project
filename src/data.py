@@ -3,8 +3,10 @@ import numpy as np
 from os import path
 from torch.utils.data import DataLoader, Dataset
 from torch import tensor
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.model_selection import train_test_split
 
-from src.download_data import download_movielens_dataset, download_netflix_dataset, netflix_build_rating_table
+from src.download_data import *
 
 ### ----------------------------------------------------------------------- Get Data -------------------------------------------------------------------------------- ###
 
@@ -24,17 +26,41 @@ def get_movielens_ratings():
         engine='python')
     
     ratings['timestamp'] = pd.to_datetime(ratings['timestamp'])
-    return ratings
-
-def get_netflix_ratings():
-    # Download the data from web
-    download_netflix_dataset()
-
-    # Load the rating csv
-    ratings = netflix_build_rating_table()
-    ratings['timestamp'] = pd.to_datetime(ratings['timestamp'])
-    return ratings
     
+    print(f'Movielens ratings shape: {ratings.shape}')
+    print(f'Number of users: {ratings["user_id"].nunique()}')
+    print(f'Number of items: {ratings["item_id"].nunique()}')
+    return ratings
+
+def get_books_ratings():
+    """
+    Downliad the books dataset from the web (if needed) and load the ratings file into a Pandas DataFrame
+    """
+    # Download data from web
+    download_books_dataset()
+
+    # Load the ratings data into a Pandas DataFrame
+    ratings = pd.read_csv(
+        path.join('data', 'books', 'BX-Book-Ratings.csv'), 
+        delimiter=';',
+        encoding='latin-1',
+        low_memory=False
+        )
+    ratings.columns = ['user_id','item_id','rating']
+
+    # Clear implicit data
+    mask = ratings['rating'] > 0
+    ratings = ratings.loc[mask]
+
+    # Ordinal encoding the users and items for smarter embedding layers
+    oe = OrdinalEncoder()
+    ratings[['user_id', 'item_id']] = oe.fit_transform(ratings[['user_id', 'item_id']].values)
+    ratings[['user_id', 'item_id']] = ratings[['user_id', 'item_id']].astype(int)
+
+    print(f'Books ratings shape: {ratings.shape}')
+    print(f'Number of users: {ratings["user_id"].nunique()}')
+    print(f'Number of items: {ratings["item_id"].nunique()}')
+    return ratings
     
 ### ----------------------------------------------------------------------- Split Data -------------------------------------------------------------------------------- ###
 
@@ -42,16 +68,20 @@ def train_valid_test_split(df):
     """
     Split the data into train, validation, test, and full-train sets based on the timestamp.
     """
-    # Split to train and test by time
-    first_test_ts = df['timestamp'].quantile(0.98)   # Get the 98 quantile of the time to cut the test set
-    df_full_train = df.loc[df['timestamp'] < first_test_ts]     # Will be used for training before the test predictions
-    df_test = df.loc[df['timestamp'] >= first_test_ts]
+    if 'timestamp' in df.columns:
+        # Split to train and test by time
+        first_test_ts = df['timestamp'].quantile(0.98)   # Get the 98 quantile of the time to cut the test set
+        df_full_train = df.loc[df['timestamp'] < first_test_ts]     # Will be used for training before the test predictions
+        df_test = df.loc[df['timestamp'] >= first_test_ts]
 
-    # Split the remaining train to train and valid by time
-    first_valid_ts = df_full_train['timestamp'].quantile(0.98)  # Get the 98 quantile of the remaining training time to cut the valid set
-    df_train = df_full_train.loc[df_full_train['timestamp'] < first_valid_ts]
-    df_valid = df_full_train.loc[df_full_train['timestamp'] >= first_valid_ts]
-    del df
+        # Split the remaining train to train and valid by time
+        first_valid_ts = df_full_train['timestamp'].quantile(0.98)  # Get the 98 quantile of the remaining training time to cut the valid set
+        df_train = df_full_train.loc[df_full_train['timestamp'] < first_valid_ts]
+        df_valid = df_full_train.loc[df_full_train['timestamp'] >= first_valid_ts]
+    else:   # Books data - split by random
+        df_full_train, df_test = train_test_split(df, test_size=0.10)
+        df_train, df_valid = train_test_split(df_full_train, test_size=0.10)
+
     return df_train, df_valid, df_test, df_full_train
 
 
@@ -60,9 +90,12 @@ def train_valid_test_split_autorec(df):
     Split the data into train and test sets based on the timestamp.
     This method works in a cummulative way, meanning the test set contain all the train does + the additional records the last timestamps has.
     """
-    # Split to train and test by time
-    first_test_ts = df['timestamp'].quantile(0.98)  # Get the 98 quantile of the time to add only into the test set
-    df_train = df.loc[df['timestamp'] < first_test_ts]  # Keep only the first timestamps for training
+    if 'timestamp' in df.columns:
+        # Split to train and test by time
+        first_test_ts = df['timestamp'].quantile(0.98)  # Get the 98 quantile of the time to add only into the test set
+        df_train = df.loc[df['timestamp'] < first_test_ts]  # Keep only the first timestamps for training
+    else:   # Books data - split by random
+        df_train, _ = train_test_split(df, test_size=0.10)
     return df_train, df.copy()
 
 ### ----------------------------------------------------------------------- Processing -------------------------------------------------------------------------------- ###
@@ -169,7 +202,7 @@ def mf_dataloaders(dataset_name, device, batch_size:int = 128):
     if dataset_name == 'movielens':
         ratings = get_movielens_ratings()
     else:
-        ratings = get_netflix_ratings()
+        ratings = get_books_ratings()
         
     df_train, df_valid, df_test, df_full_train = train_valid_test_split(df=ratings)
     df_train, df_valid, df_test, df_full_train = remove_non_trained_users_items(df_train, df_valid, df_test, df_full_train)
@@ -223,7 +256,7 @@ def dataloaders(dataset_name, device, by_user:bool = False, batch_size:int = 128
     if dataset_name == 'movielens':
         ratings = get_movielens_ratings()
     else:
-        ratings = get_netflix_ratings()
+        ratings = get_books_ratings()
 
     df_train_tmp, df_test = train_valid_test_split_autorec(df=ratings)
     df_train, df_valid = train_valid_test_split_autorec(df=df_train_tmp)
@@ -252,4 +285,5 @@ def get_data(model_name, dataset_name, batch_size, device):
 
 ## For testing only
 if __name__ == '__main__':
-    dl_ml_train, dl_ml_valid, dl_ml_test, dl_ml_full_train = dataloaders(dataset_name='movielens', batch_size=128, device='cpu')
+    dataset_name = 'books'
+    get_data(model_name='MF', dataset_name=dataset_name, batch_size=128, device='cpu')
