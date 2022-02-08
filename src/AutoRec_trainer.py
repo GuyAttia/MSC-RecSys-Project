@@ -10,7 +10,7 @@ from src.loss import *
 # We used the Ignite package for smarter building of our trainers.
 # This package provide built-in loggers and handlers for different actions.
 
-def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name):
+def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name, mrr_threshold=4):
     """
     Build a trainer for the AutoRec model
     """
@@ -69,7 +69,7 @@ def train_autorec(model, optimizer, max_epochs, early_stopping, dl_train, dl_tes
     val_metrics = {
         "loss": Loss(criterion)
     }
-    mrr_metric = MetricMRR_Vec()
+    mrr_metric = MetricMRR_Vec(mrr_threshold=mrr_threshold)
 
     train_evaluator = Engine(validation_step)
     val_evaluator = Engine(validation_step)
@@ -160,6 +160,7 @@ if __name__ == '__main__':
     dataset_name = 'books' #'movielens'
 
     max_epochs = 2
+    mrr_threshold = 8
     model_name = 'AutoRec'
     best_params = {
         'learning_rate': 0.001, 
@@ -170,4 +171,4 @@ if __name__ == '__main__':
     dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'], device=device)
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)
+    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name, mrr_threshold=mrr_threshold)

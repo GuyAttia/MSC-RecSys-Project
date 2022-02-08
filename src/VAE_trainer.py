@@ -11,7 +11,7 @@ from src.loss import *
 # We used the Ignite package for smarter building of our trainers.
 # This package provide built-in loggers and handlers for different actions.
 
-def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name):
+def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name, mrr_threshold=4):
     """
     Build a trainer for the VAE model
     """
@@ -72,7 +72,7 @@ def train_vae(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, d
         "loss": Loss(criterion),
         'rmse_loss': Loss(criterion2)
     }
-    mrr_metric = MetricMRR_Vec()
+    mrr_metric = MetricMRR_Vec(mrr_threshold=mrr_threshold)
 
     train_evaluator = Engine(validation_step)
     val_evaluator = Engine(validation_step)
@@ -161,7 +161,8 @@ if __name__ == '__main__':
     from src.data import *
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dataset_name = 'movielens'
+    dataset_name = 'books'
+    mrr_threshold = 8
 
     max_epochs = 2
     model_name = 'VAE'
@@ -176,4 +177,4 @@ if __name__ == '__main__':
     dl_train, _, dl_test, _ = dataloaders(dataset_name=dataset_name, batch_size=best_params['batch_size'], device=device)
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)
+    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name, mrr_threshold=mrr_threshold)

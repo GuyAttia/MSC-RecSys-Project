@@ -11,7 +11,7 @@ from src.data import get_data
 from src.loss import mrr
 
 
-def train(model_name, model, optimizer, epochs, dl_train, dl_test, device, dataset_name):
+def train(model_name, model, optimizer, epochs, dl_train, dl_test, device, dataset_name, mrr_threshold=4):
     """
     Execute the proper trainer with the right model, optimizer and relevant data loaders.
     """
@@ -19,18 +19,18 @@ def train(model_name, model, optimizer, epochs, dl_train, dl_test, device, datas
     if model_name == 'MF':
         loss = mf_trainer.train_mf(
             model=model, optimizer=optimizer, max_epochs=epochs, early_stopping=3, 
-            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name)
+            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name, mrr_threshold=mrr_threshold)
     elif model_name == 'AutoRec':
         loss = autorec_trainer.train_autorec(
             model=model, optimizer=optimizer, max_epochs=epochs, early_stopping=3, 
-            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name)
+            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name, mrr_threshold=mrr_threshold)
     elif model_name == 'VAE':
         loss = vae_trainer.train_vae(
             model=model, optimizer=optimizer, max_epochs=epochs, early_stopping=3, 
-            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name)
+            dl_train=dl_train, dl_test=dl_test, device=device, dataset_name=dataset_name, mrr_threshold=mrr_threshold)
     return loss, model
 
-def tune_params(model_name, dataset_name, n_trials, max_epochs, device):
+def tune_params(model_name, dataset_name, n_trials, max_epochs, device, mrr_threshold=4):
     """
     Use the Optuna package for hyperparameters tuning.
     - Define the ranges for the relevant hyperparameters
@@ -75,7 +75,7 @@ def tune_params(model_name, dataset_name, n_trials, max_epochs, device):
         dl_train, dl_valid, _, _ = get_data(model_name=model_name, dataset_name=dataset_name, batch_size=params['batch_size'], device=device)
         model = get_model(model_name, params, dl_train)  # Build model
         optimizer = getattr(optim, params['optimizer'])(model.parameters(), lr= params['learning_rate'])  # Instantiate optimizer
-        valid_loss, _ = train(model_name, model, optimizer, max_epochs, dl_train, dl_valid, device, dataset_name)  # Train the model and calc the validation loss
+        valid_loss, _ = train(model_name, model, optimizer, max_epochs, dl_train, dl_valid, device, dataset_name, mrr_threshold=mrr_threshold)  # Train the model and calc the validation loss
 
         return valid_loss
 
@@ -87,7 +87,7 @@ def tune_params(model_name, dataset_name, n_trials, max_epochs, device):
     return study, df_trials_results
 
 
-def calc_final_mrr(model_name, model, dl_test):
+def calc_final_mrr(model_name, model, dl_test, mrr_threshold=4):
     """
     Calculate the final MRR score for the fully trained model.
     Based on the model type, extract the entire test set, 
@@ -112,7 +112,7 @@ def calc_final_mrr(model_name, model, dl_test):
         y_preds = torch.clone(y_preds.detach()).to('cpu')
         df_preds = pd.DataFrame({'user_id': test_users, 'item_id': test_items, 'rating': y_preds})
         ratings_preds = df_preds.pivot(index = 'user_id', columns ='item_id', values = 'rating').fillna(0)
-        mrr_ = mrr(pred=ratings_preds.values, actual=ratings_true.values, cutoff=5, mrr_threshold=4)
+        mrr_ = mrr(pred=ratings_preds.values, actual=ratings_true.values, cutoff=5, mrr_threshold=mrr_threshold)
     else:  # AutoRec & VAE
         x = y_test = dl_test.dataset.get_all_data()
         # Generate predictions
@@ -122,14 +122,14 @@ def calc_final_mrr(model_name, model, dl_test):
 
         # In AutoRec & VAE the predictions are already in the shape of rating matrixs so no need in processing
         if model_name == 'AutoRec':
-            mrr_ = mrr(pred=y_preds.cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=4)
+            mrr_ = mrr(pred=y_preds.cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=mrr_threshold)
         elif model_name == 'VAE':
-            mrr_ = mrr(pred=y_preds[0].cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=4)
+            mrr_ = mrr(pred=y_preds[0].cpu().numpy(), actual=y_test.cpu().numpy(), cutoff=5, mrr_threshold=mrr_threshold)
     
     return mrr_
 
 
-def final_train(model_name, dataset_name, best_params, max_epochs, device):
+def final_train(model_name, dataset_name, best_params, max_epochs, device, mrr_threshold=4):
     """
     After we optimized and choosed the best hyperparameters for the model we want to prepare it for predicting the test set.
     - Use the best hyperparameters to build the final model
@@ -142,7 +142,7 @@ def final_train(model_name, dataset_name, best_params, max_epochs, device):
     # Train the model on the full_train (train+valid) set and calc the test loss
     test_loss, final_model = train(model_name, model, optimizer, max_epochs, dl_full_train, dl_test, device, dataset_name)
     
-    mrr_ = calc_final_mrr(model_name=model_name, model=final_model, dl_test=dl_test)
+    mrr_ = calc_final_mrr(model_name=model_name, model=final_model, dl_test=dl_test, mrr_threshold=mrr_threshold)
 
     return test_loss, final_model, mrr_
 
@@ -150,9 +150,10 @@ def final_train(model_name, dataset_name, best_params, max_epochs, device):
 #### Only for testing
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dataset_name = 'movielens'
+    dataset_name = 'books'
     max_epochs = 2
     n_trials = 2
+    mrr_threshold = 8
     model_name = 'VAE' #'AutoRec' # 'MF' # "VAE"
 
     study_ml, df_tuning_results = tune_params(
@@ -160,7 +161,8 @@ if __name__ == '__main__':
     dataset_name=dataset_name, 
     max_epochs=max_epochs,
     n_trials=n_trials, 
-    device=device
+    device=device,
+    mrr_threshold=mrr_threshold
     )
 
     best_params = study_ml.best_params

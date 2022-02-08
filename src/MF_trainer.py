@@ -11,7 +11,7 @@ from src.loss import *
 # We used the Ignite package for smarter building of our trainers.
 # This package provide built-in loggers and handlers for different actions.
 
-def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name):
+def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, device, dataset_name, mrr_threshold=4):
     """
     Build a trainer for the MF model
     """
@@ -70,7 +70,7 @@ def train_mf(model, optimizer, max_epochs, early_stopping, dl_train, dl_test, de
             return y_pred, y_stack
 
     # Generate training and validation evaluators to print results during running
-    mrr_metric = MetricMRR_MF()
+    mrr_metric = MetricMRR_MF(mrr_threshold=mrr_threshold)
 
     val_metrics = {
         "loss": Loss(criterion)
@@ -168,6 +168,7 @@ if __name__ == '__main__':
 
     max_epochs = 2
     model_name = 'MF'
+    mrr_threshold = 8
     best_params = {
         'learning_rate': 0.001, 
         'optimizer': "RMSprop",
@@ -177,4 +178,4 @@ if __name__ == '__main__':
     dl_train, _, dl_test, _ = mf_dataloaders(dataset_name=dataset_name, device=device, batch_size=best_params['batch_size'])
     model = get_model(model_name, best_params, dl_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
-    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name)
+    test_loss = train(model_name, model, optimizer, max_epochs, dl_train, dl_test, device, dataset_name, mrr_threshold=mrr_threshold)
