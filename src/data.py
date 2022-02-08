@@ -57,6 +57,11 @@ def get_books_ratings():
     ratings[['user_id', 'item_id']] = oe.fit_transform(ratings[['user_id', 'item_id']].values)
     ratings[['user_id', 'item_id']] = ratings[['user_id', 'item_id']].astype(int)
 
+    # Remove users with less than 10 ratings and items with 5 ratings
+    mask_users = ratings['user_id'].isin(ratings['user_id'].value_counts()[ratings['user_id'].value_counts()>10].index)
+    mask_items = ratings['item_id'].isin(ratings['item_id'].value_counts()[ratings['item_id'].value_counts()>5].index)
+    ratings = ratings.loc[mask_users & mask_items]
+
     print(f'Books ratings shape: {ratings.shape}')
     print(f'Number of users: {ratings["user_id"].nunique()}')
     print(f'Number of items: {ratings["item_id"].nunique()}')
@@ -285,5 +290,5 @@ def get_data(model_name, dataset_name, batch_size, device):
 
 ## For testing only
 if __name__ == '__main__':
-    dataset_name = 'books'
+    dataset_name = 'movielens'
     get_data(model_name='MF', dataset_name=dataset_name, batch_size=128, device='cpu')
