@@ -140,7 +140,7 @@ def final_train(model_name, dataset_name, best_params, max_epochs, device, mrr_t
     model = get_model(model_name, best_params, dl_full_train)  # Build model
     optimizer = getattr(optim, best_params['optimizer'])(model.parameters(), lr= best_params['learning_rate'])  # Instantiate optimizer
     # Train the model on the full_train (train+valid) set and calc the test loss
-    test_loss, final_model = train(model_name, model, optimizer, max_epochs, dl_full_train, dl_test, device, dataset_name)
+    test_loss, final_model = train(model_name, model, optimizer, max_epochs, dl_full_train, dl_test, device, dataset_name, mrr_threshold=mrr_threshold)
     
     mrr_ = calc_final_mrr(model_name=model_name, model=final_model, dl_test=dl_test, mrr_threshold=mrr_threshold)
 
