@@ -1,28 +1,26 @@
-import requests
-import tarfile
 import zipfile
-import pandas as pd
-import gc
-from os import path, mkdir, listdir
-from tqdm import tqdm
+from os import mkdir, path
+
+import requests
 
 
-def create_data_dir(dataset_name:str) -> str:
+def create_data_dir(dataset_name: str) -> str:
     """
     Check if the data directory exists and create it if not
-    
+
     :param dataset_name: The name of the downloaded dataset
     :return: The full path of the created directory
     """
     if not path.isdir('data'):
         mkdir('data')
-    
+
     data_dir = path.join('data', dataset_name)
     if not path.isdir(data_dir):
         mkdir(data_dir)
     return data_dir
 
 ### ----------------------------------------------------------------------- Movielens 1M -------------------------------------------------------------------------------- ###
+
 
 def download_movielens_dataset():
     """
@@ -33,7 +31,7 @@ def download_movielens_dataset():
     url = 'https://files.grouplens.org/datasets/movielens/ml-1m.zip'
     zip_name = path.join(data_dir, url.split('/')[-1])
 
-    ## Download only if file doesn't exists
+    # Download only if file doesn't exists
     if not path.isfile(zip_name):
         print('Downloading the MovieLens data')
         r = requests.get(url, allow_redirects=True)
@@ -46,16 +44,17 @@ def download_movielens_dataset():
 
 ### ----------------------------------------------------------------------- Books -------------------------------------------------------------------------------- ###
 
+
 def download_books_dataset():
     """
     Download the Books (BX) dataset from the web
     """
     data_dir = create_data_dir(dataset_name='books')
-    
+
     url = 'http://www2.informatik.uni-freiburg.de/~cziegler/BX/BX-CSV-Dump.zip'
     zip_name = path.join(data_dir, url.split('/')[-1])
 
-    ## Download only if file doesn't exists
+    # Download only if file doesn't exists
     if not path.isfile(zip_name):
         print('Downloading the Books data - it make take time - please wait')
         r = requests.get(url, allow_redirects=True)

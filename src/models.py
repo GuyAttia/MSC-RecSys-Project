@@ -8,14 +8,17 @@ class MF(nn.Module):
     """
     Matrix Factorizaion model implementation
     """
+
     def __init__(self, num_users, num_items, params):
         super().__init__()
         # Get relevant hyperparameters from the params dict
         latent_dim = params['latent_dim']
 
         # Initialize embedding layers for the users and for the items
-        self.embedding_user = torch.nn.Embedding(num_embeddings=num_users+1, embedding_dim=latent_dim)
-        self.embedding_item = torch.nn.Embedding(num_embeddings=num_items+1, embedding_dim=latent_dim)
+        self.embedding_user = torch.nn.Embedding(
+            num_embeddings=num_users+1, embedding_dim=latent_dim)
+        self.embedding_item = torch.nn.Embedding(
+            num_embeddings=num_items+1, embedding_dim=latent_dim)
 
     def forward(self, user_indices, item_indices):
         # Get the user and item vector using the embedding layers
@@ -31,6 +34,7 @@ class EncoderLinear(nn.Module):
     """
     Encoder implementation (can be used for both, AutoRec and VAE)
     """
+
     def __init__(self, in_dim, params):
         super().__init__()
         # Get relevant hyperparameters from the params dict
@@ -41,15 +45,12 @@ class EncoderLinear(nn.Module):
         # Add deep layers
         modules = []
         for i in range(len(layers_sizes) - 1):
-            modules.append(nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
-            # modules.append(nn.ReLU())
-            # modules.append(nn.Identity())
+            modules.append(
+                nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
 
         # Add last layer for Z
         modules.append(nn.Linear(layers_sizes[-1], latent_dim, bias=True))
-        # modules.append(nn.ReLU())
-        # modules.append(nn.Identity())
-        
+
         # Generate the layers sequence foe easier implementation
         self.seq = nn.Sequential(*modules)
 
@@ -61,6 +62,7 @@ class DecoderLinear(nn.Module):
     """
     Decoder implementation (can be used for both, AutoRec and VAE)
     """
+
     def __init__(self, out_dim, params):
         super().__init__()
         # Get relevant hyperparameters from the params dict
@@ -71,13 +73,12 @@ class DecoderLinear(nn.Module):
         modules = []
         # Add last layer for Z
         modules.append(nn.Linear(latent_dim, layers_sizes[0], bias=True))
-        # modules.append(nn.ReLU())
         modules.append(nn.Sigmoid())
 
         # Add deep layers
         for i in range(len(layers_sizes) - 1):
-            modules.append(nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
-            # modules.append(nn.ReLU())
+            modules.append(
+                nn.Linear(layers_sizes[i], layers_sizes[i + 1], bias=True))
             modules.append(nn.Sigmoid())
 
         # Generate the layers sequence foe easier implementation
@@ -91,6 +92,7 @@ class AutoRec(nn.Module):
     """
     AutoRec model implementation
     """
+
     def __init__(self, encoder, decoder):
         super().__init__()
 
@@ -106,6 +108,7 @@ class VAE(nn.Module):
     """
     VAE model implementation
     """
+
     def __init__(self, n_dim, params):
         super().__init__()
         self.p_dims = params.get('p_dims', [250, 500]).copy()
@@ -124,10 +127,10 @@ class VAE(nn.Module):
         # Last dimension of q- network is for mean and variance
         temp_q_dims = self.q_dims[:-1] + [self.q_dims[-1] * 2]
         self.q_layers = nn.ModuleList([nn.Linear(d_in, d_out) for
-            d_in, d_out in zip(temp_q_dims[:-1], temp_q_dims[1:])])
+                                       d_in, d_out in zip(temp_q_dims[:-1], temp_q_dims[1:])])
         self.p_layers = nn.ModuleList([nn.Linear(d_in, d_out) for
-            d_in, d_out in zip(self.p_dims[:-1], self.p_dims[1:])])
-        
+                                       d_in, d_out in zip(self.p_dims[:-1], self.p_dims[1:])])
+
         self.drop = nn.Dropout(dropout)
         self.init_weights()
 
@@ -135,11 +138,11 @@ class VAE(nn.Module):
         mu, logvar = self.encode(input)
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
-    
+
     def encode(self, input):
         h = F.normalize(input)
         h = self.drop(h)
-        
+
         for i, layer in enumerate(self.q_layers):
             h = layer(h)
             if i != len(self.q_layers) - 1:
@@ -158,7 +161,7 @@ class VAE(nn.Module):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return eps.mul(std).add_(mu)
-    
+
     def decode(self, z):
         h = z
         for i, layer in enumerate(self.p_layers):
@@ -183,7 +186,7 @@ class VAE(nn.Module):
 
             # Normal Initialization for Biases
             layer.bias.data.normal_(0.0, 0.001)
-        
+
         for layer in self.p_layers:
             # Xavier Initialization for weights
             size = layer.weight.size()
